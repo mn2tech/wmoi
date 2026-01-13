@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  CHURCH_ADMIN
+  VIEWER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  TRANSFERRED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(CHURCH_ADMIN)
+  churchId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  church Church? @relation(fields: [churchId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([churchId])
+}
+
+model Church {
+  id              String   @id @default(cuid())
+  name            String
+  city            String
+  state           String
+  address         String?
+  pastorName      String
+  pastorPhone     String?
+  pastorEmail     String?
+  churchPhone     String?
+  churchEmail     String?
+  establishedDate DateTime?
+  status          String   @default("Active")
+  registrationDetails String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users   User[]
+  members Member[]
+
+  @@index([name])
+  @@index([status])
+}
+
+model Member {
+  id              String           @id @default(cuid())
+  churchId        String
+  firstName       String
+  lastName        String
+  dateOfBirth     DateTime?
+  gender          String?
+  phoneNumber     String?
+  email           String?
+  street          String?
+  city            String?
+  state           String?
+  zip             String?
+  dateJoined      DateTime         @default(now())
+  membershipStatus MembershipStatus @default(ACTIVE)
+  baptismDate     DateTime?
+  spouseName      String?
+  childrenInfo    String?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@index([membershipStatus])
+  @@index([firstName, lastName])
+}
+
