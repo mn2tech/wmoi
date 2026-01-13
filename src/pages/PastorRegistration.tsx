@@ -44,7 +44,7 @@ export default function PastorRegistration() {
         .order('name')
 
       if (error) throw error
-      setChurches(data || [])
+      setChurches((data || []) as Church[])
     } catch (error) {
       console.error('Error loading churches:', error)
     }

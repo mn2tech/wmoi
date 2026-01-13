@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect, createContext } from 'react'
 import { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabaseClient'
-import { isChurchUser, getChurchUser, isAdmin, isPastor } from './lib/churchAuth'
+import { isChurchUser, getChurchUser } from './lib/churchAuth'
 import Login from './pages/Login'
 import RegisterChurchUser from './pages/RegisterChurchUser'
 import PastorRegistration from './pages/PastorRegistration'

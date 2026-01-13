@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { Church, Member, MemberFormData } from '../types'
+import { Church, MemberFormData } from '../types'
 
 export default function ChurchForm() {
   const [churches, setChurches] = useState<Church[]>([])
@@ -14,7 +14,7 @@ export default function ChurchForm() {
   const [pastorName, setPastorName] = useState('')
   const [pastorPhone, setPastorPhone] = useState('')
   const [pastorEmail, setPastorEmail] = useState('')
-  const [pastorPhoto, setPastorPhoto] = useState<File | null>(null)
+  const [_pastorPhoto, setPastorPhoto] = useState<File | null>(null) // File is uploaded immediately, state kept for form handling
   const [pastorPhotoUrl, setPastorPhotoUrl] = useState('')
   const [attendance, setAttendance] = useState<number>(0)
   const [tithes, setTithes] = useState<number>(0)

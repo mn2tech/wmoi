@@ -77,7 +77,7 @@ export function exportToExcel(churches: Church[], members: Member[]) {
 
 export function exportToPDF(
   churches: Church[],
-  members: Member[],
+  _members: Member[], // Unused but kept for API consistency
   stats: {
     totalChurches: number
     totalMembers: number

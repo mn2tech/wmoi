@@ -5,6 +5,7 @@ import { Church, Member } from '../types'
 import { ToastContext } from '../App'
 
 export default function PastorDashboard() {
+  const toast = useContext(ToastContext)
   const [church, setChurch] = useState<Church | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
@@ -370,8 +371,9 @@ export default function PastorDashboard() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteMember(member.id)}
+                        onClick={() => member.id && handleDeleteMember(member.id)}
                         className="text-red-600 hover:text-red-900"
+                        disabled={!member.id}
                       >
                         Delete
                       </button>

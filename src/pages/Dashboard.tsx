@@ -59,7 +59,6 @@ export default function Dashboard() {
     console.log('Saved layouts:', localStorage.getItem('dashboard_layouts'))
     console.log('Saved visibility:', localStorage.getItem('dashboard_widget_visibility'))
     
-    const savedLayouts = localStorage.getItem('dashboard_layouts')
     const savedVisibility = localStorage.getItem('dashboard_widget_visibility')
     
     // Load visibility preferences
