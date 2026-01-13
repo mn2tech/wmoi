@@ -66,6 +66,20 @@ Check if environment variables are being read during build:
 
 ## Step 6: Common Issues and Fixes
 
+### Issue: Invalid API key
+**Symptom**: Console shows "Invalid API key" or 401/403 errors
+**Fix**: 
+1. Go to Supabase Dashboard → Settings → API
+2. Copy the **"anon public"** key (NOT the service_role key)
+3. Verify the key in Amplify Console:
+   - No extra spaces before/after
+   - No quotes around the value
+   - Key starts with `eyJ` (JWT format)
+4. Update the `VITE_SUPABASE_ANON_KEY` variable in Amplify
+5. Redeploy the app
+
+**Important**: Use the **anon public** key, NOT the service_role key!
+
 ### Issue: Environment variables not set
 **Symptom**: Console shows `❌ CRITICAL: Missing Supabase environment variables!`
 **Fix**: Add environment variables in Amplify Console and redeploy
