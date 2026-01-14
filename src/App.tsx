@@ -172,13 +172,7 @@ function App() {
         />
         <Route
           path="/register-pastor"
-          element={
-            canAccess && userRole === 'admin' ? (
-              <PastorRegistration />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
+          element={<PastorRegistration />}
         />
         <Route
           path="/"

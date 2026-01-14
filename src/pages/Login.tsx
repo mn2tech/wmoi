@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { isChurchUser } from '../lib/churchAuth'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -199,20 +199,20 @@ export default function Login() {
           </div>
           <div className="text-center space-y-2">
             <div>
-              <a
-                href="/register-pastor"
+              <Link
+                to="/register-pastor"
                 className="text-sm text-blue-600 hover:text-blue-500"
               >
                 Pastor Registration (Pre-assigned by admin)
-              </a>
+              </Link>
             </div>
             <div>
-              <a
-                href="/register"
+              <Link
+                to="/register"
                 className="text-sm text-gray-600 hover:text-gray-500"
               >
                 Admin Registration
-              </a>
+              </Link>
             </div>
           </div>
         </form>
