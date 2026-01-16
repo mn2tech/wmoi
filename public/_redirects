@@ -1,1 +1,21 @@
+# AWS Amplify redirects for SPA
+# Redirect all routes to index.html except static assets
+
+# Serve static assets directly (no redirect)
+/assets/*    200
+/*.js       200
+/*.css      200
+/*.json     200
+/*.png      200
+/*.jpg      200
+/*.jpeg     200
+/*.gif      200
+/*.svg      200
+/*.ico      200
+/*.woff     200
+/*.woff2    200
+/*.ttf      200
+/*.eot      200
+
+# Redirect all other routes to index.html for React Router
 /*    /index.html   200
