@@ -44,38 +44,55 @@ export default function PastorRegistration() {
       
       // First, try loading pending assignments without the join
       console.log('🔍 Loading pending assignments...')
-      console.log('🔍 Supabase client:', supabase)
-      console.log('🔍 Current auth session:', await supabase.auth.getSession())
       
-      const { data, error } = await supabase
-        .from('pending_pastor_assignments')
-        .select('*')
-        .eq('status', 'pending')
-        .order('pastor_name')
+      let data: any = null
+      let error: any = null
+      
+      try {
+        const result = await supabase
+          .from('pending_pastor_assignments')
+          .select('*')
+          .eq('status', 'pending')
+          .order('pastor_name')
+        
+        data = result.data
+        error = result.error
 
-      console.log('📊 Query result:', { 
-        data, 
-        error, 
-        dataLength: data?.length,
-        errorCode: error?.code,
-        errorMessage: error?.message,
-        errorDetails: error?.details,
-        errorHint: error?.hint
-      })
-      
-      if (error) {
-        console.error('❌ Full error object:', JSON.stringify(error, null, 2))
+        console.log('📊 Query result:', { 
+          data, 
+          error, 
+          dataLength: data?.length,
+          errorCode: error?.code,
+          errorMessage: error?.message,
+          errorDetails: error?.details,
+          errorHint: error?.hint,
+          hasData: !!data,
+          dataIsArray: Array.isArray(data)
+        })
+        
+        // Log the actual response
+        if (data) {
+          console.log('✅ Data received:', JSON.stringify(data, null, 2))
+        }
+        if (error) {
+          console.error('❌ Error received:', JSON.stringify(error, null, 2))
+        }
+      } catch (queryError: any) {
+        console.error('❌ Query threw exception:', queryError)
+        console.error('❌ Error name:', queryError?.name)
+        console.error('❌ Error message:', queryError?.message)
+        error = queryError
       }
       
       if (data && data.length > 0) {
-        console.log('✅ Found assignments:', data.map(a => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
+        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
       } else {
         console.warn('⚠️ No data returned or empty array')
       }
 
       // If we have data, process it even if there was an error (might be AbortError)
       if (data && data.length > 0) {
-        console.log('✅ Found assignments:', data.map(a => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
+        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
         // Continue processing data even if there was an error
       } else if (error) {
         // Only handle error if we don't have data
@@ -109,7 +126,7 @@ export default function PastorRegistration() {
 
       // Load church details separately for each assignment
       const assignmentsWithChurches = await Promise.all(
-        (data || []).map(async (assignment) => {
+        (data || []).map(async (assignment: PendingAssignment) => {
           try {
             const { data: churchData, error: churchError } = await supabase
               .from('churches')
