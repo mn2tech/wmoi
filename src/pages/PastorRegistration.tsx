@@ -76,6 +76,11 @@ export default function PastorRegistration() {
         }
         if (error) {
           console.error('❌ Error received:', JSON.stringify(error, null, 2))
+          // Check if it's an AbortError in the error object
+          if (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.details?.includes('AbortError')) {
+            console.warn('⚠️ AbortError detected in error object - will retry or ignore')
+            // Don't return yet - let's see if we can retry
+          }
         }
       } catch (queryError: any) {
         console.error('❌ Query threw exception:', queryError)
@@ -84,25 +89,25 @@ export default function PastorRegistration() {
         error = queryError
       }
       
-      if (data && data.length > 0) {
-        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
-      } else {
-        console.warn('⚠️ No data returned or empty array')
-      }
-
-      // If we have data, process it even if there was an error (might be AbortError)
-      if (data && data.length > 0) {
-        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
-        // Continue processing data even if there was an error
-      } else if (error) {
-        // Only handle error if we don't have data
-        // Ignore AbortError
-        if (error.message?.includes('aborted') || error.name === 'AbortError') {
-          console.warn('⚠️ AbortError when loading pending assignments - ignoring')
+      // Check for AbortError first - if it's an AbortError, retry
+      if (error && (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.details?.includes('AbortError'))) {
+        console.warn('⚠️ AbortError detected - retrying...')
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+          return loadPendingAssignments(retryCount + 1)
+        } else {
+          console.warn('⚠️ Max retries reached for AbortError - giving up')
           setLoadingAssignments(false)
           return
         }
-        
+      }
+      
+      if (data && data.length > 0) {
+        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
+        // Continue processing data even if there was an error (might be AbortError)
+      } else if (error) {
+        // Only handle error if we don't have data and it's not AbortError (already handled above)
         console.error('Error loading pending assignments:', error)
         console.error('Error details:', {
           message: error.message,
