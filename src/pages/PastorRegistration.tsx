@@ -37,7 +37,8 @@ export default function PastorRegistration() {
     loadPendingAssignments()
   }, [])
 
-  const loadPendingAssignments = async () => {
+  const loadPendingAssignments = async (retryCount = 0) => {
+    const MAX_RETRIES = 2
     try {
       setLoadingAssignments(true)
       
@@ -49,6 +50,12 @@ export default function PastorRegistration() {
         .order('pastor_name')
 
       if (error) {
+        // Ignore AbortError
+        if (error.message?.includes('aborted') || error.name === 'AbortError') {
+          console.warn('⚠️ AbortError when loading pending assignments - ignoring')
+          return
+        }
+        
         console.error('Error loading pending assignments:', error)
         console.error('Error details:', {
           message: error.message,
@@ -56,6 +63,14 @@ export default function PastorRegistration() {
           details: error.details,
           hint: error.hint
         })
+        
+        // Retry on network errors
+        if (retryCount < MAX_RETRIES && (error.message?.includes('network') || error.message?.includes('fetch'))) {
+          console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+          return loadPendingAssignments(retryCount + 1)
+        }
+        
         throw error
       }
 
@@ -93,9 +108,27 @@ export default function PastorRegistration() {
 
       setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
     } catch (error: any) {
+      // Ignore AbortError - it's usually from hot reload or request cancellation
+      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+        console.warn('⚠️ AbortError when loading pending assignments (likely from hot reload) - ignoring')
+        // Don't show error to user for AbortError, but ensure loading state is cleared
+        setLoadingAssignments(false)
+        return
+      }
+      
       console.error('Error loading pending assignments:', error)
       const errorMessage = error?.message || 'Failed to load pending assignments'
-      toast?.error(`Failed to load pending assignments: ${errorMessage}. Please refresh the page.`)
+      
+      // Only show error if we've exhausted retries
+      const MAX_RETRIES = 2
+      if (retryCount >= MAX_RETRIES) {
+        toast?.error(`Failed to load pending assignments: ${errorMessage}. Please refresh the page.`)
+      } else {
+        // Retry on any error (not just network errors)
+        console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return loadPendingAssignments(retryCount + 1)
+      }
     } finally {
       setLoadingAssignments(false)
     }
