@@ -43,11 +43,14 @@ export default function PastorRegistration() {
       setLoadingAssignments(true)
       
       // First, try loading pending assignments without the join
+      console.log('🔍 Loading pending assignments...')
       const { data, error } = await supabase
         .from('pending_pastor_assignments')
         .select('*')
         .eq('status', 'pending')
         .order('pastor_name')
+
+      console.log('📊 Query result:', { data, error, dataLength: data?.length })
 
       if (error) {
         // Ignore AbortError
@@ -388,9 +391,22 @@ export default function PastorRegistration() {
                 </select>
               )}
               {pendingAssignments.length === 0 && !loadingAssignments && (
-                <p className="mt-1 text-xs text-gray-500">
-                  No pending assignments found. Please contact your administrator to be assigned first.
-                </p>
+                <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800 font-semibold mb-1">
+                    ⚠️ No pending assignments found
+                  </p>
+                  <p className="text-xs text-yellow-700 mb-2">
+                    This could mean:
+                  </p>
+                  <ul className="text-xs text-yellow-700 list-disc list-inside space-y-1 mb-2">
+                    <li>Your administrator hasn't created a pending assignment for you yet</li>
+                    <li>The RLS policies may not be configured correctly</li>
+                    <li>Check the browser console (F12) for detailed error messages</li>
+                  </ul>
+                  <p className="text-xs text-yellow-700">
+                    Please contact your administrator to be assigned first, or ask them to run the migration script: <code className="bg-yellow-100 px-1 rounded">FIX_PENDING_ASSIGNMENTS_RLS.sql</code>
+                  </p>
+                </div>
               )}
             </div>
 
