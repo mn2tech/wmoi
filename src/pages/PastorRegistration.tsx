@@ -10,6 +10,7 @@ interface PendingAssignment {
   pastor_name: string
   pastor_email?: string | null
   status: string
+  churches?: Church
 }
 
 export default function PastorRegistration() {
@@ -20,7 +21,7 @@ export default function PastorRegistration() {
   const [success, setSuccess] = useState('')
   const [pendingAssignment, setPendingAssignment] = useState<PendingAssignment | null>(null)
   const [assignedChurch, setAssignedChurch] = useState<Church | null>(null)
-  const [checkingEmail, setCheckingEmail] = useState(false)
+  const [loadingAssignments, setLoadingAssignments] = useState(true)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -29,86 +30,82 @@ export default function PastorRegistration() {
     confirmPassword: '',
   })
 
-  const [selectedChurchId, setSelectedChurchId] = useState<string>('')
-  const [churches, setChurches] = useState<Church[]>([])
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>('')
+  const [pendingAssignments, setPendingAssignments] = useState<PendingAssignment[]>([])
 
   useEffect(() => {
-    loadChurches()
+    loadPendingAssignments()
   }, [])
 
-  const loadChurches = async () => {
+  const loadPendingAssignments = async () => {
+    try {
+      setLoadingAssignments(true)
+      const { data, error } = await supabase
+        .from('pending_pastor_assignments')
+        .select(`
+          *,
+          churches:church_id (
+            id,
+            name,
+            location
+          )
+        `)
+        .eq('status', 'pending')
+        .order('pastor_name')
+
+      if (error) throw error
+      setPendingAssignments((data || []) as PendingAssignment[])
+    } catch (error) {
+      console.error('Error loading pending assignments:', error)
+      toast?.error('Failed to load pending assignments. Please refresh the page.')
+    } finally {
+      setLoadingAssignments(false)
+    }
+  }
+
+  const handleAssignmentSelect = (assignmentId: string) => {
+    setSelectedAssignmentId(assignmentId)
+    
+    if (!assignmentId) {
+      setPendingAssignment(null)
+      setAssignedChurch(null)
+      setFormData({ ...formData, name: '' })
+      return
+    }
+
+    const assignment = pendingAssignments.find(a => a.id === assignmentId)
+    if (assignment) {
+      setPendingAssignment(assignment)
+      
+      // Extract church from the joined data
+      if (assignment.churches) {
+        setAssignedChurch(assignment.churches as Church)
+      } else {
+        // Fallback: load church separately if join didn't work
+        loadChurchDetails(assignment.church_id)
+      }
+      
+      // Pre-fill the name
+      setFormData({ ...formData, name: assignment.pastor_name })
+    }
+  }
+
+  const loadChurchDetails = async (churchId: string) => {
     try {
       const { data, error } = await supabase
         .from('churches')
-        .select('id, name, location')
-        .order('name')
-
-      if (error) throw error
-      setChurches((data || []) as Church[])
-    } catch (error) {
-      console.error('Error loading churches:', error)
-    }
-  }
-
-  const checkPendingAssignment = async (name: string, churchId: string) => {
-    if (!name || !churchId) {
-      setPendingAssignment(null)
-      setAssignedChurch(null)
-      return
-    }
-    
-    setCheckingEmail(true)
-    try {
-      const { data, error } = await supabase
-        .from('pending_pastor_assignments')
         .select('*')
-        .eq('pastor_name', name.trim())
-        .eq('church_id', churchId)
-        .eq('status', 'pending')
-        .maybeSingle()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking pending assignment:', error)
-        return
-      }
-
+        .eq('id', churchId)
+        .single()
+      
+      if (error) throw error
       if (data) {
-        setPendingAssignment(data)
-        
-        // Load church details
-        const { data: churchData } = await supabase
-          .from('churches')
-          .select('*')
-          .eq('id', data.church_id)
-          .single()
-        
-        if (churchData) {
-          setAssignedChurch(churchData)
-        }
-      } else {
-        setPendingAssignment(null)
-        setAssignedChurch(null)
+        setAssignedChurch(data as Church)
       }
     } catch (error) {
-      console.error('Error checking pending assignment:', error)
-    } finally {
-      setCheckingEmail(false)
+      console.error('Error loading church details:', error)
     }
   }
-
-  useEffect(() => {
-    // Check for pending assignment when name or church changes
-    const timeoutId = setTimeout(() => {
-      if (formData.name && selectedChurchId) {
-        checkPendingAssignment(formData.name, selectedChurchId)
-      } else {
-        setPendingAssignment(null)
-        setAssignedChurch(null)
-      }
-    }, 500) // Debounce
-
-    return () => clearTimeout(timeoutId)
-  }, [formData.name, selectedChurchId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,14 +114,14 @@ export default function PastorRegistration() {
     setSuccess('')
 
     // Validation
-    if (!formData.name || !formData.email || !formData.password || !selectedChurchId) {
+    if (!formData.name || !formData.email || !formData.password || !selectedAssignmentId) {
       setError('Please fill in all required fields')
       setLoading(false)
       return
     }
 
     if (!pendingAssignment) {
-      setError('No pending assignment found for this name and church. Please contact your administrator to be assigned first.')
+      setError('Please select your name from the dropdown. If you don\'t see your name, contact your administrator to be assigned first.')
       setLoading(false)
       return
     }
@@ -295,52 +292,41 @@ export default function PastorRegistration() {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
+              <label htmlFor="pastorName" className="block text-sm font-medium text-gray-700 mb-1">
+                Select Your Name *
               </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Your full name (must match admin's entry)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="church" className="block text-sm font-medium text-gray-700 mb-1">
-                Select Your Church *
-              </label>
-              <select
-                id="church"
-                name="church"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                value={selectedChurchId}
-                onChange={(e) => {
-                  setSelectedChurchId(e.target.value)
-                  // Check for pending assignment when church is selected
-                  if (formData.name && e.target.value) {
-                    checkPendingAssignment(formData.name, e.target.value)
-                  }
-                }}
-              >
-                <option value="">-- Select your church --</option>
-                {churches.map((church) => (
-                  <option key={church.id} value={church.id}>
-                    {church.name} - {church.location}
-                  </option>
-                ))}
-              </select>
+              {loadingAssignments ? (
+                <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 text-sm">
+                  Loading pending assignments...
+                </div>
+              ) : (
+                <select
+                  id="pastorName"
+                  name="pastorName"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  value={selectedAssignmentId}
+                  onChange={(e) => handleAssignmentSelect(e.target.value)}
+                >
+                  <option value="">-- Select your name --</option>
+                  {pendingAssignments.map((assignment) => (
+                    <option key={assignment.id} value={assignment.id}>
+                      {assignment.pastor_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {pendingAssignments.length === 0 && !loadingAssignments && (
+                <p className="mt-1 text-xs text-gray-500">
+                  No pending assignments found. Please contact your administrator to be assigned first.
+                </p>
+              )}
             </div>
 
             {pendingAssignment && assignedChurch && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3">
                 <p className="text-sm text-green-800 font-semibold mb-2">
-                  ✓ Pre-assigned Church Found!
+                  ✓ Your Assigned Church
                 </p>
                 <div className="text-xs text-green-700 space-y-1">
                   <p>
@@ -357,23 +343,28 @@ export default function PastorRegistration() {
                 </div>
               </div>
             )}
-            
-            {!pendingAssignment && formData.name && selectedChurchId && !checkingEmail && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                <p className="text-sm text-yellow-800">
-                  <strong>⚠ No pending assignment found</strong>
+
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name *
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                required
+                disabled={!!pendingAssignment}
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Your full name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+              {pendingAssignment && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Name is pre-filled from your assignment. You can edit it if needed.
                 </p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  No assignment found for "{formData.name}" at the selected church. Please contact your administrator.
-                </p>
-              </div>
-            )}
-            
-            {checkingEmail && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-sm text-blue-800">Checking for pending assignment...</p>
-              </div>
-            )}
+              )}
+            </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
