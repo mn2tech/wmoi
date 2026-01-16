@@ -40,24 +40,62 @@ export default function PastorRegistration() {
   const loadPendingAssignments = async () => {
     try {
       setLoadingAssignments(true)
+      
+      // First, try loading pending assignments without the join
       const { data, error } = await supabase
         .from('pending_pastor_assignments')
-        .select(`
-          *,
-          churches:church_id (
-            id,
-            name,
-            location
-          )
-        `)
+        .select('*')
         .eq('status', 'pending')
         .order('pastor_name')
 
-      if (error) throw error
-      setPendingAssignments((data || []) as PendingAssignment[])
-    } catch (error) {
+      if (error) {
+        console.error('Error loading pending assignments:', error)
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
+        throw error
+      }
+
+      // Load church details separately for each assignment
+      const assignmentsWithChurches = await Promise.all(
+        (data || []).map(async (assignment) => {
+          try {
+            const { data: churchData, error: churchError } = await supabase
+              .from('churches')
+              .select('id, name, location')
+              .eq('id', assignment.church_id)
+              .single()
+
+            if (churchError) {
+              console.warn(`Failed to load church ${assignment.church_id}:`, churchError)
+              return {
+                ...assignment,
+                churches: null
+              }
+            }
+
+            return {
+              ...assignment,
+              churches: churchData
+            }
+          } catch (err) {
+            console.warn(`Error loading church for assignment ${assignment.id}:`, err)
+            return {
+              ...assignment,
+              churches: null
+            }
+          }
+        })
+      )
+
+      setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
+    } catch (error: any) {
       console.error('Error loading pending assignments:', error)
-      toast?.error('Failed to load pending assignments. Please refresh the page.')
+      const errorMessage = error?.message || 'Failed to load pending assignments'
+      toast?.error(`Failed to load pending assignments: ${errorMessage}. Please refresh the page.`)
     } finally {
       setLoadingAssignments(false)
     }
