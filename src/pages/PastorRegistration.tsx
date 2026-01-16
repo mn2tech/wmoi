@@ -44,13 +44,34 @@ export default function PastorRegistration() {
       
       // First, try loading pending assignments without the join
       console.log('🔍 Loading pending assignments...')
+      console.log('🔍 Supabase client:', supabase)
+      console.log('🔍 Current auth session:', await supabase.auth.getSession())
+      
       const { data, error } = await supabase
         .from('pending_pastor_assignments')
         .select('*')
         .eq('status', 'pending')
         .order('pastor_name')
 
-      console.log('📊 Query result:', { data, error, dataLength: data?.length })
+      console.log('📊 Query result:', { 
+        data, 
+        error, 
+        dataLength: data?.length,
+        errorCode: error?.code,
+        errorMessage: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint
+      })
+      
+      if (error) {
+        console.error('❌ Full error object:', JSON.stringify(error, null, 2))
+      }
+      
+      if (data && data.length > 0) {
+        console.log('✅ Found assignments:', data.map(a => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
+      } else {
+        console.warn('⚠️ No data returned or empty array')
+      }
 
       if (error) {
         // Ignore AbortError
@@ -109,7 +130,14 @@ export default function PastorRegistration() {
         })
       )
 
+      console.log('✅ Final assignments with churches:', assignmentsWithChurches)
+      console.log('✅ Setting pending assignments state with', assignmentsWithChurches.length, 'items')
       setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
+      
+      // Log state after setting
+      setTimeout(() => {
+        console.log('📋 Current pendingAssignments state length:', assignmentsWithChurches.length)
+      }, 100)
     } catch (error: any) {
       // Ignore AbortError - it's usually from hot reload or request cancellation
       if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
