@@ -73,10 +73,16 @@ export default function PastorRegistration() {
         console.warn('⚠️ No data returned or empty array')
       }
 
-      if (error) {
+      // If we have data, process it even if there was an error (might be AbortError)
+      if (data && data.length > 0) {
+        console.log('✅ Found assignments:', data.map(a => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
+        // Continue processing data even if there was an error
+      } else if (error) {
+        // Only handle error if we don't have data
         // Ignore AbortError
         if (error.message?.includes('aborted') || error.name === 'AbortError') {
           console.warn('⚠️ AbortError when loading pending assignments - ignoring')
+          setLoadingAssignments(false)
           return
         }
         
@@ -96,6 +102,9 @@ export default function PastorRegistration() {
         }
         
         throw error
+      } else {
+        // No data and no error - empty result
+        console.warn('⚠️ No data returned and no error - empty result')
       }
 
       // Load church details separately for each assignment
