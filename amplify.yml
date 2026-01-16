@@ -25,3 +25,5 @@ customHeaders:
         value: 'DENY'
       - key: 'X-XSS-Protection'
         value: '1; mode=block'
+# Redirects for SPA routing - all routes go to index.html
+# Note: The _redirects file in public/ should also handle this, but adding here for Amplify
