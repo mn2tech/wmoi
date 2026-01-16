@@ -35,6 +35,10 @@ export default function PastorRegistration() {
 
   useEffect(() => {
     loadPendingAssignments()
+    // Cleanup function - component unmounted
+    return () => {
+      // Component cleanup if needed
+    }
   }, [])
 
   const loadPendingAssignments = async (retryCount = 0) => {
@@ -75,11 +79,16 @@ export default function PastorRegistration() {
           console.log('✅ Data received:', JSON.stringify(data, null, 2))
         }
         if (error) {
-          console.error('❌ Error received:', JSON.stringify(error, null, 2))
-          // Check if it's an AbortError in the error object
-          if (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.details?.includes('AbortError')) {
-            console.warn('⚠️ AbortError detected in error object - will retry or ignore')
-            // Don't return yet - let's see if we can retry
+          // Check if it's an AbortError first - don't log as error if we'll retry
+          const isAbortError = error.message?.includes('AbortError') || 
+                              error.message?.includes('aborted') || 
+                              error.details?.includes('AbortError')
+          
+          if (isAbortError) {
+            console.warn('⚠️ AbortError detected in error object - will retry')
+            // Don't log as error - we'll handle it below
+          } else {
+            console.error('❌ Error received:', JSON.stringify(error, null, 2))
           }
         }
       } catch (queryError: any) {
