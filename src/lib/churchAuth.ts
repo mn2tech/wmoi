@@ -16,11 +16,13 @@ export interface ChurchUser {
  * Get church user record for the current authenticated user
  * This ensures only church app users can access the app
  */
-export async function getChurchUser(authUser: User | null): Promise<ChurchUser | null> {
+export async function getChurchUser(authUser: User | null, retryCount = 0): Promise<ChurchUser | null> {
   if (!authUser) {
     console.log('⚠️ No auth user provided')
     return null
   }
+
+  const MAX_RETRIES = 2
 
   try {
     console.log('🔍 Querying church_users table for user:', authUser.id.substring(0, 8) + '...')
@@ -31,14 +33,31 @@ export async function getChurchUser(authUser: User | null): Promise<ChurchUser |
       .eq('auth_user_id', authUser.id)
       .maybeSingle() // Use maybeSingle instead of single to handle no results gracefully
 
-    // Check for AbortError before logging
+    // If we have data, return it even if there's an error (might be AbortError)
+    if (data) {
+      console.log('✅ Found church user:', data.email, 'Role:', data.role, 'Church ID:', data.church_id || 'None (Admin)')
+      return data
+    }
+
+    // Check for AbortError - retry if it's an AbortError
     if (error) {
       const errorMessage = error.message || ''
       const errorName = (error as any)?.name || ''
+      const errorDetails = error.details || ''
       
-      // Ignore AbortError - it's from hot reload or request cancellation
-      if (errorMessage.includes('aborted') || errorName === 'AbortError' || errorMessage.includes('AbortError')) {
-        console.warn('⚠️ Request aborted in getChurchUser (likely from hot reload) - ignoring')
+      const isAbortError = errorMessage.includes('aborted') || 
+                          errorName === 'AbortError' || 
+                          errorMessage.includes('AbortError') ||
+                          errorDetails.includes('AbortError')
+      
+      if (isAbortError && retryCount < MAX_RETRIES) {
+        console.warn(`⚠️ Request aborted in getChurchUser - retrying (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        return getChurchUser(authUser, retryCount + 1)
+      }
+      
+      if (isAbortError) {
+        console.warn('⚠️ Request aborted in getChurchUser - max retries reached')
         return null
       }
       
@@ -55,20 +74,19 @@ export async function getChurchUser(authUser: User | null): Promise<ChurchUser |
       return null
     }
     
-    console.log('📋 Query result - data:', data ? 'Found' : 'Not found')
-
-    if (data) {
-      console.log('✅ Found church user:', data.email, 'Role:', data.role, 'Church ID:', data.church_id || 'None (Admin)')
-    } else {
-      console.log('ℹ️ User not found in church_users table')
-      console.log('💡 To fix: Run ADD_USER_TO_CHURCH_USERS.sql in Supabase SQL Editor')
-    }
-
-    return data
+    console.log('ℹ️ User not found in church_users table')
+    console.log('💡 To fix: Run ADD_USER_TO_CHURCH_USERS.sql in Supabase SQL Editor')
+    return null
   } catch (error: any) {
-    // Ignore AbortError - it's usually from hot reload or request cancellation
+    // Check if it's AbortError - retry if we haven't exceeded max retries
+    if ((error?.name === 'AbortError' || error?.message?.includes('aborted')) && retryCount < MAX_RETRIES) {
+      console.warn(`⚠️ Request aborted in getChurchUser (exception) - retrying (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+      return getChurchUser(authUser, retryCount + 1)
+    }
+    
     if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
-      console.warn('⚠️ Request aborted in getChurchUser (likely from hot reload)')
+      console.warn('⚠️ Request aborted in getChurchUser - max retries reached')
       return null
     }
     
