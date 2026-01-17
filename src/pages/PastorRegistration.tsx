@@ -44,17 +44,28 @@ export default function PastorRegistration() {
   const loadPendingAssignments = async () => {
     try {
       setLoadingAssignments(true)
+      console.log('🔍 [START] Loading pending assignments...')
       
       // Simple, direct query - no nested try-catch, no complex error handling
+      console.log('🔍 [QUERY] Making Supabase query...')
       const { data, error } = await supabase
         .from('pending_pastor_assignments')
         .select('*')
         .eq('status', 'pending')
         .order('pastor_name')
 
+      console.log('🔍 [RESULT] Query completed:', {
+        hasData: !!data,
+        dataType: Array.isArray(data) ? 'array' : typeof data,
+        dataLength: data?.length,
+        hasError: !!error,
+        errorMessage: error?.message,
+        errorDetails: error?.details
+      })
+
       // If we have data, use it (even if there's an error - might be AbortError)
       if (data && Array.isArray(data) && data.length > 0) {
-        console.log('✅ Found', data.length, 'pending assignments')
+        console.log('✅ [SUCCESS] Found', data.length, 'pending assignments:', data.map(a => a.pastor_name))
         
         // Load church details for each assignment
         const assignmentsWithChurches = await Promise.all(
@@ -80,12 +91,17 @@ export default function PastorRegistration() {
           })
         )
 
+        console.log('✅ [SUCCESS] Setting', assignmentsWithChurches.length, 'assignments to state')
         setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
+        console.log('✅ [SUCCESS] State updated, assignments should now be visible')
         return
       }
 
+      console.log('⚠️ [NO DATA] No assignments found. Data:', data, 'Error:', error)
+
       // If no data and there's an error, check if it's AbortError
       if (error) {
+        console.log('⚠️ [ERROR] Error detected:', error)
         const isAbortError = error.message?.includes('AbortError') || 
                             error.message?.includes('aborted') || 
                             error.details?.includes('AbortError')
@@ -134,6 +150,7 @@ export default function PastorRegistration() {
       }
 
       // No data and no error (or AbortError after retry) - empty result
+      console.log('⚠️ [EMPTY] Setting empty array - no assignments found')
       setPendingAssignments([])
     } catch (error: any) {
       // Ignore AbortError - it's usually from hot reload or request cancellation
