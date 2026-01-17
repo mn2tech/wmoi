@@ -197,23 +197,13 @@ export default function Login() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
-          <div className="text-center space-y-2">
-            <div>
-              <Link
-                to="/register-pastor"
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                Pastor Registration (Pre-assigned by admin)
-              </Link>
-            </div>
-            <div>
-              <Link
-                to="/register"
-                className="text-sm text-gray-600 hover:text-gray-500"
-              >
-                Admin Registration
-              </Link>
-            </div>
+          <div className="text-center">
+            <Link
+              to="/register"
+              className="text-sm text-gray-600 hover:text-gray-500"
+            >
+              Admin Registration
+            </Link>
           </div>
         </form>
       </div>

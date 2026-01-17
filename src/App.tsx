@@ -5,7 +5,7 @@ import { supabase } from './lib/supabaseClient'
 import { isChurchUser, getChurchUser } from './lib/churchAuth'
 import Login from './pages/Login'
 import RegisterChurchUser from './pages/RegisterChurchUser'
-import PastorRegistration from './pages/PastorRegistration'
+// import PastorRegistration from './pages/PastorRegistration' // Temporarily disabled
 import Dashboard from './pages/Dashboard'
 import ChurchForm from './pages/ChurchForm'
 import ManageChurches from './pages/ManageChurches'
@@ -170,10 +170,12 @@ function App() {
           path="/register"
           element={<RegisterChurchUser />}
         />
+        {/* Pastor Registration temporarily disabled
         <Route
           path="/register-pastor"
           element={<PastorRegistration />}
         />
+        */}
         <Route
           path="/"
           element={
