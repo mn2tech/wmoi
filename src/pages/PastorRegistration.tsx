@@ -48,19 +48,29 @@ export default function PastorRegistration() {
       
       // Simple, direct query - no nested try-catch, no complex error handling
       console.log('🔍 [QUERY] Making Supabase query...')
-      const { data, error } = await supabase
-        .from('pending_pastor_assignments')
-        .select('*')
-        .eq('status', 'pending')
-        .order('pastor_name')
+      let queryResult: any = null
+      try {
+        queryResult = await supabase
+          .from('pending_pastor_assignments')
+          .select('*')
+          .eq('status', 'pending')
+          .order('pastor_name')
+      } catch (queryException: any) {
+        console.error('🔍 [QUERY] Query threw exception:', queryException)
+        queryResult = { data: null, error: queryException }
+      }
+      
+      const { data, error } = queryResult || { data: null, error: null }
 
       console.log('🔍 [RESULT] Query completed:', {
         hasData: !!data,
         dataType: Array.isArray(data) ? 'array' : typeof data,
         dataLength: data?.length,
+        dataPreview: data ? JSON.stringify(data.slice(0, 2)) : null,
         hasError: !!error,
         errorMessage: error?.message,
-        errorDetails: error?.details
+        errorDetails: error?.details,
+        errorCode: error?.code
       })
 
       // If we have data, use it (even if there's an error - might be AbortError)
@@ -108,16 +118,25 @@ export default function PastorRegistration() {
         
         if (isAbortError) {
           // AbortError - try one more time after a delay
-          console.warn('⚠️ Request aborted, retrying once...')
+          console.warn('⚠️ [ABORT] Request aborted, retrying once...')
           await new Promise(resolve => setTimeout(resolve, 2000))
           
-          const { data: retryData } = await supabase
+          console.log('🔍 [RETRY] Making retry query...')
+          const { data: retryData, error: retryError } = await supabase
             .from('pending_pastor_assignments')
             .select('*')
             .eq('status', 'pending')
             .order('pastor_name')
           
+          console.log('🔍 [RETRY RESULT] Retry completed:', {
+            hasData: !!retryData,
+            dataLength: retryData?.length,
+            hasError: !!retryError,
+            errorMessage: retryError?.message
+          })
+          
           if (retryData && retryData.length > 0) {
+            console.log('✅ [RETRY SUCCESS] Found', retryData.length, 'assignments on retry')
             const assignmentsWithChurches = await Promise.all(
               retryData.map(async (assignment: PendingAssignment) => {
                 try {
@@ -139,8 +158,11 @@ export default function PastorRegistration() {
                 }
               })
             )
+            console.log('✅ [RETRY SUCCESS] Setting', assignmentsWithChurches.length, 'assignments to state')
             setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
             return
+          } else {
+            console.warn('⚠️ [RETRY FAILED] Retry also returned no data')
           }
         } else {
           // Real error (not AbortError)
