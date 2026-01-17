@@ -41,164 +41,108 @@ export default function PastorRegistration() {
     }
   }, [])
 
-  const loadPendingAssignments = async (retryCount = 0) => {
-    const MAX_RETRIES = 2
+  const loadPendingAssignments = async () => {
     try {
       setLoadingAssignments(true)
       
-      // First, try loading pending assignments without the join
-      console.log('🔍 Loading pending assignments...')
-      
-      let data: any = null
-      let error: any = null
-      
-      try {
-        const result = await supabase
-          .from('pending_pastor_assignments')
-          .select('*')
-          .eq('status', 'pending')
-          .order('pastor_name')
-        
-        data = result.data
-        error = result.error
+      // Simple, direct query - no nested try-catch, no complex error handling
+      const { data, error } = await supabase
+        .from('pending_pastor_assignments')
+        .select('*')
+        .eq('status', 'pending')
+        .order('pastor_name')
 
-        console.log('📊 Query result:', { 
-          data, 
-          error, 
-          dataLength: data?.length,
-          errorCode: error?.code,
-          errorMessage: error?.message,
-          errorDetails: error?.details,
-          errorHint: error?.hint,
-          hasData: !!data,
-          dataIsArray: Array.isArray(data)
-        })
+      // If we have data, use it (even if there's an error - might be AbortError)
+      if (data && Array.isArray(data) && data.length > 0) {
+        console.log('✅ Found', data.length, 'pending assignments')
         
-        // Log the actual response
-        if (data) {
-          console.log('✅ Data received:', JSON.stringify(data, null, 2))
-        }
-        if (error) {
-          // Check if it's an AbortError first - don't log as error if we'll retry
-          const isAbortError = error.message?.includes('AbortError') || 
-                              error.message?.includes('aborted') || 
-                              error.details?.includes('AbortError')
-          
-          if (isAbortError) {
-            console.warn('⚠️ AbortError detected in error object - will retry')
-            // Don't log as error - we'll handle it below
-          } else {
-            console.error('❌ Error received:', JSON.stringify(error, null, 2))
-          }
-        }
-      } catch (queryError: any) {
-        console.error('❌ Query threw exception:', queryError)
-        console.error('❌ Error name:', queryError?.name)
-        console.error('❌ Error message:', queryError?.message)
-        error = queryError
-      }
-      
-      // Check for AbortError first - if it's an AbortError, retry
-      if (error && (error.message?.includes('AbortError') || error.message?.includes('aborted') || error.details?.includes('AbortError'))) {
-        console.warn('⚠️ AbortError detected - retrying...')
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-          return loadPendingAssignments(retryCount + 1)
-        } else {
-          console.warn('⚠️ Max retries reached for AbortError - giving up')
-          setLoadingAssignments(false)
-          return
-        }
-      }
-      
-      if (data && data.length > 0) {
-        console.log('✅ Found assignments:', data.map((a: PendingAssignment) => ({ id: a.id, name: a.pastor_name, church: a.church_id })))
-        // Continue processing data even if there was an error (might be AbortError)
-      } else if (error) {
-        // Only handle error if we don't have data and it's not AbortError (already handled above)
-        console.error('Error loading pending assignments:', error)
-        console.error('Error details:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        })
-        
-        // Retry on network errors
-        if (retryCount < MAX_RETRIES && (error.message?.includes('network') || error.message?.includes('fetch'))) {
-          console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
-          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-          return loadPendingAssignments(retryCount + 1)
-        }
-        
-        throw error
-      } else {
-        // No data and no error - empty result
-        console.warn('⚠️ No data returned and no error - empty result')
-      }
+        // Load church details for each assignment
+        const assignmentsWithChurches = await Promise.all(
+          data.map(async (assignment: PendingAssignment) => {
+            try {
+              const { data: churchData } = await supabase
+                .from('churches')
+                .select('id, name, location')
+                .eq('id', assignment.church_id)
+                .single()
 
-      // Load church details separately for each assignment
-      const assignmentsWithChurches = await Promise.all(
-        (data || []).map(async (assignment: PendingAssignment) => {
-          try {
-            const { data: churchData, error: churchError } = await supabase
-              .from('churches')
-              .select('id, name, location')
-              .eq('id', assignment.church_id)
-              .single()
-
-            if (churchError) {
-              console.warn(`Failed to load church ${assignment.church_id}:`, churchError)
+              return {
+                ...assignment,
+                churches: churchData || null
+              }
+            } catch {
+              // If church load fails, still include assignment without church details
               return {
                 ...assignment,
                 churches: null
               }
             }
+          })
+        )
 
-            return {
-              ...assignment,
-              churches: churchData
-            }
-          } catch (err) {
-            console.warn(`Error loading church for assignment ${assignment.id}:`, err)
-            return {
-              ...assignment,
-              churches: null
-            }
+        setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
+        return
+      }
+
+      // If no data and there's an error, check if it's AbortError
+      if (error) {
+        const isAbortError = error.message?.includes('AbortError') || 
+                            error.message?.includes('aborted') || 
+                            error.details?.includes('AbortError')
+        
+        if (isAbortError) {
+          // AbortError - try one more time after a delay
+          console.warn('⚠️ Request aborted, retrying once...')
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          
+          const { data: retryData } = await supabase
+            .from('pending_pastor_assignments')
+            .select('*')
+            .eq('status', 'pending')
+            .order('pastor_name')
+          
+          if (retryData && retryData.length > 0) {
+            const assignmentsWithChurches = await Promise.all(
+              retryData.map(async (assignment: PendingAssignment) => {
+                try {
+                  const { data: churchData } = await supabase
+                    .from('churches')
+                    .select('id, name, location')
+                    .eq('id', assignment.church_id)
+                    .single()
+
+                  return {
+                    ...assignment,
+                    churches: churchData || null
+                  }
+                } catch {
+                  return {
+                    ...assignment,
+                    churches: null
+                  }
+                }
+              })
+            )
+            setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
+            return
           }
-        })
-      )
+        } else {
+          // Real error (not AbortError)
+          console.error('Error loading pending assignments:', error)
+          toast?.error('Failed to load pending assignments. Please refresh the page.')
+        }
+      }
 
-      console.log('✅ Final assignments with churches:', assignmentsWithChurches)
-      console.log('✅ Setting pending assignments state with', assignmentsWithChurches.length, 'items')
-      setPendingAssignments(assignmentsWithChurches as PendingAssignment[])
-      
-      // Log state after setting
-      setTimeout(() => {
-        console.log('📋 Current pendingAssignments state length:', assignmentsWithChurches.length)
-      }, 100)
+      // No data and no error (or AbortError after retry) - empty result
+      setPendingAssignments([])
     } catch (error: any) {
       // Ignore AbortError - it's usually from hot reload or request cancellation
       if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
-        console.warn('⚠️ AbortError when loading pending assignments (likely from hot reload) - ignoring')
-        // Don't show error to user for AbortError, but ensure loading state is cleared
-        setLoadingAssignments(false)
-        return
-      }
-      
-      console.error('Error loading pending assignments:', error)
-      const errorMessage = error?.message || 'Failed to load pending assignments'
-      
-      // Only show error if we've exhausted retries
-      const MAX_RETRIES = 2
-      if (retryCount >= MAX_RETRIES) {
-        toast?.error(`Failed to load pending assignments: ${errorMessage}. Please refresh the page.`)
+        console.warn('⚠️ AbortError when loading pending assignments - ignoring')
+        setPendingAssignments([])
       } else {
-        // Retry on any error (not just network errors)
-        console.log(`Retrying load pending assignments (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
-        return loadPendingAssignments(retryCount + 1)
+        console.error('Error loading pending assignments:', error)
+        toast?.error('Failed to load pending assignments. Please refresh the page.')
       }
     } finally {
       setLoadingAssignments(false)
