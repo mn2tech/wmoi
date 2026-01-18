@@ -29,13 +29,23 @@ export async function getChurchUser(authUser: User | null, retryCount = 0): Prom
     console.log('🔍 Full auth user ID:', authUser.id)
     console.log('🔍 Auth user email:', authUser.email)
     
+    const queryStart = Date.now()
     const { data, error } = await supabase
       .from('church_users')
       .select('*')
       .eq('auth_user_id', authUser.id)
       .maybeSingle() // Use maybeSingle instead of single to handle no results gracefully
+    const queryEnd = Date.now()
 
-    console.log('🔍 Query completed - data:', data ? 'Found' : 'Not found', 'error:', error ? `${error.code}: ${error.message}` : 'None')
+    console.log('🔍 Query completed in', queryEnd - queryStart, 'ms')
+    console.log('🔍 Query result - data:', data ? JSON.stringify(data) : 'null', 'error:', error ? JSON.stringify({code: error.code, message: error.message, details: error.details, hint: error.hint}) : 'null')
+    
+    // Log the exact query being made
+    console.log('🔍 Query details:', {
+      table: 'church_users',
+      filter: `auth_user_id = '${authUser.id}'`,
+      authUserId: authUser.id
+    })
 
     // If we have data, return it even if there's an error (might be AbortError)
     if (data) {
