@@ -14,8 +14,7 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-# Custom redirects for React Router (SPA)
-# All routes should serve index.html
+# Custom headers for security
 customHeaders:
   - pattern: '**/*'
     headers:
@@ -25,5 +24,7 @@ customHeaders:
         value: 'DENY'
       - key: 'X-XSS-Protection'
         value: '1; mode=block'
-# Redirects for SPA routing - all routes go to index.html
-# Note: The _redirects file in public/ should also handle this, but adding here for Amplify
+# Note: Redirects are handled by _redirects file in public/
+# If 404 errors persist, configure redirects in AWS Amplify Console:
+# App settings → Rewrites and redirects → Add rule:
+# Source: </^[^.]+$/>  Target: /index.html  Type: 200 (Rewrite)
