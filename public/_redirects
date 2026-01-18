@@ -18,5 +18,5 @@
 /*.eot       200
 
 # Redirect all other routes to index.html for React Router (SPA)
-# This handles both with and without trailing slashes
-</^[^.]+$/>    /index.html   200
+# Simple pattern that matches any path without a file extension
+/*    /index.html   200
