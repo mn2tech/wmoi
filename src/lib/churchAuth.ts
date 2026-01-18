@@ -73,13 +73,21 @@ export async function getChurchUser(authUser: User | null, retryCount = 0): Prom
                           errorDetails.includes('AbortError')
       
       if (isAbortError && retryCount < MAX_RETRIES) {
-        console.warn(`⚠️ Request aborted in getChurchUser - retrying (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+        const retryDelay = 500 * (retryCount + 1) // 500ms, 1000ms, 1500ms
+        console.warn(`⚠️ Request aborted in getChurchUser - retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay))
         return getChurchUser(authUser, retryCount + 1)
       }
       
       if (isAbortError) {
         console.warn('⚠️ Request aborted in getChurchUser - max retries reached')
+        console.warn('💡 This might be a development issue (hot reload) or network problem')
+        // Don't return null immediately - try one more time with a longer delay
+        if (retryCount === 0) {
+          console.warn('⚠️ Attempting one final retry with longer delay...')
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          return getChurchUser(authUser, MAX_RETRIES)
+        }
         return null
       }
       
