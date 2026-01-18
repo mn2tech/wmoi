@@ -429,6 +429,7 @@ export default function AssignPastors() {
       {/* Create New Pastor - Temporarily Hidden */}
       {/* This section is hidden because pastor self-registration is the preferred flow */}
       {/* Uncomment this section if you need to create pastor accounts directly */}
+      {/* 
       {false && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Create New Pastor Account and Assign Church</h2>
@@ -489,6 +490,7 @@ export default function AssignPastors() {
           </button>
         </div>
       )}
+      */}
 
       {/* Assigned Pastors List */}
       <div className="bg-white p-6 rounded-lg shadow">
