@@ -27,15 +27,16 @@ export default function AssignPastors() {
   const [churchUsers, setChurchUsers] = useState<ChurchUser[]>([])
   const [pendingAssignments, setPendingAssignments] = useState<PendingAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedChurch, setSelectedChurch] = useState<string>('')
-  const [selectedUser, setSelectedUser] = useState<string>('')
-  const [newPastorEmail, setNewPastorEmail] = useState('')
-  const [newPastorName, setNewPastorName] = useState('')
-  const [newPastorPassword, setNewPastorPassword] = useState('')
-  
   // Pending assignment form
   const [pendingPastorName, setPendingPastorName] = useState('')
   const [pendingChurchId, setPendingChurchId] = useState<string>('')
+  
+  // Unused state (for hidden sections - can be removed if not needed)
+  // const [selectedChurch, setSelectedChurch] = useState<string>('')
+  // const [selectedUser, setSelectedUser] = useState<string>('')
+  // const [newPastorEmail, setNewPastorEmail] = useState('')
+  // const [newPastorName, setNewPastorName] = useState('')
+  // const [newPastorPassword, setNewPastorPassword] = useState('')
 
   useEffect(() => {
     loadData()
@@ -43,25 +44,43 @@ export default function AssignPastors() {
 
   const loadData = async () => {
     try {
+      setLoading(true)
       const [churchesRes, usersRes, pendingRes] = await Promise.all([
         supabase.from('churches').select('*').order('name'),
         supabase.from('church_users').select('*').order('email'),
         supabase.from('pending_pastor_assignments').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
       ])
 
-      if (churchesRes.error) throw churchesRes.error
-      if (usersRes.error) throw usersRes.error
+      if (churchesRes.error) {
+        console.error('Error loading churches:', churchesRes.error)
+        toast?.error('Failed to load churches')
+      } else {
+        setChurches(churchesRes.data || [])
+      }
 
-      setChurches(churchesRes.data || [])
-      setChurchUsers(usersRes.data || [])
-      setPendingAssignments(pendingRes.data || [])
-    } catch (error) {
+      if (usersRes.error) {
+        console.error('Error loading users:', usersRes.error)
+        toast?.error('Failed to load users')
+      } else {
+        setChurchUsers(usersRes.data || [])
+      }
+
+      if (pendingRes.error) {
+        console.error('Error loading pending assignments:', pendingRes.error)
+        toast?.error('Failed to load pending assignments')
+      } else {
+        setPendingAssignments(pendingRes.data || [])
+      }
+    } catch (error: any) {
       console.error('Error loading data:', error)
+      toast?.error(`Error loading data: ${error.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
   }
 
+  // Unused functions (for hidden sections - not relevant since there are no regular users)
+  /*
   const handleAssignPastor = async () => {
     if (!selectedChurch || !selectedUser) {
       toast?.warning('Please select both a church and a user')
@@ -149,9 +168,10 @@ export default function AssignPastors() {
       toast?.error(`Error creating pastor: ${error.message}`)
     }
   }
+  */
 
   const handleUnassignPastor = async (userId: string, churchId: string) => {
-    if (!window.confirm('Are you sure you want to unassign this pastor?')) return
+    if (!window.confirm('Are you sure you want to unassign this pastor from their church?')) return
 
     try {
       // Remove church_id and set role back to user
@@ -206,10 +226,10 @@ export default function AssignPastors() {
       if (error) {
         if (error.code === '23505') {
           toast?.warning('A pending assignment already exists for this church and pastor name')
+          return
         } else {
           throw error
         }
-        return
       }
 
       toast?.success('Pending assignment created! The pastor can now register and enter their email.')
@@ -223,7 +243,7 @@ export default function AssignPastors() {
   }
 
   const handleCancelPendingAssignment = async (assignmentId: string) => {
-    if (!window.confirm('Are you sure you want to cancel this pending assignment?')) return
+    if (!window.confirm('Are you sure you want to cancel this pending assignment? The pastor will not be able to register using this assignment.')) return
 
     try {
       const { error } = await supabase
@@ -244,9 +264,10 @@ export default function AssignPastors() {
     return <div className="text-center py-12">Loading...</div>
   }
 
-  const unassignedUsers = churchUsers.filter(
-    (u) => u.role !== 'admin' && (!u.church_id || u.church_id === null)
-  )
+  // Unused variable (for hidden section)
+  // const unassignedUsers = churchUsers.filter(
+  //   (u) => u.role !== 'admin' && (!u.church_id || u.church_id === null)
+  // )
   const assignedPastors = churchUsers.filter(
     (u) => u.role === 'pastor' && u.church_id
   )
@@ -256,15 +277,15 @@ export default function AssignPastors() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Assign Pastors to Churches</h1>
         <p className="text-gray-600 mt-2">
-          Step 1: Pre-assign a church to a pastor (by name and email). Step 2: Pastor completes registration with their details.
+          Pre-assign churches to pastors by name. Pastors will complete their registration when available.
         </p>
       </div>
 
       {/* Create Pending Assignment */}
       <div className="bg-blue-50 border-2 border-blue-200 p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Step 1: Pre-Assign Church to Pastor</h2>
+        <h2 className="text-xl font-semibold mb-4">Pre-Assign Church to Pastor</h2>
         <p className="text-sm text-gray-700 mb-4">
-          Enter the pastor's name and select their church. The pastor will then register themselves and enter their own email.
+          Enter the pastor's name and select their church. This creates a pending assignment that the pastor can use when registration is available.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -295,19 +316,21 @@ export default function AssignPastors() {
         </div>
         <button
           onClick={handleCreatePendingAssignment}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Create Pending Assignment
         </button>
-        <p className="text-xs text-gray-600 mt-2">
-          After creating this, share the registration link with the pastor: <code className="bg-gray-100 px-1 rounded">/register-pastor</code>
-        </p>
       </div>
 
       {/* Pending Assignments List */}
-      {pendingAssignments.length > 0 && (
-        <div className="bg-yellow-50 border-2 border-yellow-200 p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Pending Assignments (Waiting for Pastor Registration)</h2>
+      <div className="bg-yellow-50 border-2 border-yellow-200 p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">
+          Pending Assignments {pendingAssignments.length > 0 && `(${pendingAssignments.length})`}
+        </h2>
+        {pendingAssignments.length === 0 ? (
+          <p className="text-gray-600">No pending assignments. Create one above to get started.</p>
+        ) : (
+          <>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -348,114 +371,124 @@ export default function AssignPastors() {
               </tbody>
             </table>
           </div>
+          </>
+        )}
+      </div>
+
+      {/* Assign Existing User - Hidden (not relevant since there are no regular users) */}
+      {/* This section is hidden because the app only has admins and pastors, no regular users to assign */}
+      {/* 
+      {false && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Assign Church to Existing User</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Select a church and an existing user to assign them as the pastor for that church.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Church</label>
+              <select
+                value={selectedChurch}
+                onChange={(e) => setSelectedChurch(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a church...</option>
+                {churches.map((church) => (
+                  <option key={church.id} value={church.id}>
+                    {church.name} - {church.location}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select User</label>
+              <select
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a user...</option>
+                {unassignedUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name || user.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button
+            onClick={handleAssignPastor}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Assign Church to User
+          </button>
         </div>
       )}
+      */}
 
-      {/* Assign Existing User */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Assign Church to Existing User</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Select a church and an existing user to assign them as the pastor for that church.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Church</label>
-            <select
-              value={selectedChurch}
-              onChange={(e) => setSelectedChurch(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select a church...</option>
-              {churches.map((church) => (
-                <option key={church.id} value={church.id}>
-                  {church.name} - {church.location}
-                </option>
-              ))}
-            </select>
+      {/* Create New Pastor - Temporarily Hidden */}
+      {/* This section is hidden because pastor self-registration is the preferred flow */}
+      {/* Uncomment this section if you need to create pastor accounts directly */}
+      {false && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h2 className="text-xl font-semibold mb-4">Create New Pastor Account and Assign Church</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Create a new pastor account and immediately assign them to a church. The pastor will receive login credentials.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Church</label>
+              <select
+                value={selectedChurch}
+                onChange={(e) => setSelectedChurch(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a church...</option>
+                {churches.map((church) => (
+                  <option key={church.id} value={church.id}>
+                    {church.name} - {church.location}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                value={newPastorEmail}
+                onChange={(e) => setNewPastorEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={newPastorName}
+                onChange={(e) => setNewPastorName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+              <input
+                type="password"
+                value={newPastorPassword}
+                onChange={(e) => setNewPastorPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select User</label>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select a user...</option>
-              {unassignedUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name || user.email}
-                </option>
-              ))}
-            </select>
-          </div>
+          <button
+            onClick={handleCreateAndAssignPastor}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Create Pastor & Assign Church
+          </button>
         </div>
-        <button
-          onClick={handleAssignPastor}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Assign Church to User
-        </button>
-      </div>
-
-      {/* Create New Pastor */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Create New Pastor Account and Assign Church</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Create a new pastor account and immediately assign them to a church. The pastor will receive login credentials.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Church</label>
-            <select
-              value={selectedChurch}
-              onChange={(e) => setSelectedChurch(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select a church...</option>
-              {churches.map((church) => (
-                <option key={church.id} value={church.id}>
-                  {church.name} - {church.location}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-            <input
-              type="email"
-              value={newPastorEmail}
-              onChange={(e) => setNewPastorEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={newPastorName}
-              onChange={(e) => setNewPastorName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-            <input
-              type="password"
-              value={newPastorPassword}
-              onChange={(e) => setNewPastorPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-        </div>
-        <button
-          onClick={handleCreateAndAssignPastor}
-          className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-        >
-          Create Pastor & Assign Church
-        </button>
-      </div>
+      )}
 
       {/* Assigned Pastors List */}
       <div className="bg-white p-6 rounded-lg shadow">

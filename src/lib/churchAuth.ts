@@ -45,6 +45,14 @@ export async function getChurchUser(authUser: User | null, retryCount = 0): Prom
       const errorName = (error as any)?.name || ''
       const errorDetails = error.details || ''
       
+      console.log('📋 Query returned error:', {
+        code: error.code,
+        message: errorMessage,
+        name: errorName,
+        details: errorDetails,
+        hint: error.hint
+      })
+      
       const isAbortError = errorMessage.includes('aborted') || 
                           errorName === 'AbortError' || 
                           errorMessage.includes('AbortError') ||
@@ -61,13 +69,14 @@ export async function getChurchUser(authUser: User | null, retryCount = 0): Prom
         return null
       }
       
-      console.log('📋 Query result - error:', error.code, errorMessage)
-      
       // If table doesn't exist, log but don't throw
-      if (error.code === 'PGRST116' || errorMessage.includes('does not exist') || errorMessage.includes('relation') && errorMessage.includes('does not exist')) {
+      if (error.code === 'PGRST116' || errorMessage.includes('does not exist') || (errorMessage.includes('relation') && errorMessage.includes('does not exist'))) {
         console.error('❌ church_users table does not exist! Run migration: supabase/migrations/002_church_users_table.sql')
       } else if (error.code === 'PGRST301' || errorMessage.includes('JWT')) {
         console.error('❌ Authentication error - check your Supabase credentials')
+      } else if (error.code === 'PGRST301' || errorMessage.includes('permission denied') || errorMessage.includes('row-level security')) {
+        console.error('❌ RLS Policy Error - User may not have permission to read church_users table')
+        console.error('💡 Run FIX_CHURCH_USER_ACCESS.sql in Supabase SQL Editor')
       } else {
         console.error('❌ Error fetching church user:', error.code, errorMessage)
       }
@@ -75,7 +84,9 @@ export async function getChurchUser(authUser: User | null, retryCount = 0): Prom
     }
     
     console.log('ℹ️ User not found in church_users table')
-    console.log('💡 To fix: Run ADD_USER_TO_CHURCH_USERS.sql in Supabase SQL Editor')
+    console.log('👤 Auth User ID:', authUser.id)
+    console.log('📧 Auth User Email:', authUser.email)
+    console.log('💡 To fix: Run CHECK_AND_ADD_USER.sql in Supabase SQL Editor')
     return null
   } catch (error: any) {
     // Check if it's AbortError - retry if we haven't exceeded max retries

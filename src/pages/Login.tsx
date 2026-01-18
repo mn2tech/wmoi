@@ -37,26 +37,38 @@ export default function Login() {
       }
 
       console.log('✅ Sign in successful, checking church user status...')
+      console.log('👤 User ID:', data.session.user.id)
+      console.log('📧 User Email:', data.session.user.email)
       
       // Check if user is registered for church app with timeout
       try {
         const timeoutPromise = new Promise<boolean>((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000)
+          setTimeout(() => reject(new Error('Timeout')), 10000) // Increased to 10 seconds
         )
         
+        console.log('🔍 Calling isChurchUser...')
         const isChurch = await Promise.race([
           isChurchUser(data.session.user),
           timeoutPromise
         ])
         
+        console.log('📋 isChurchUser result:', isChurch)
+        
         if (isChurch) {
           console.log('✅ User is registered for church app, navigating to dashboard')
-          navigate('/dashboard')
+          setLoading(false) // Reset loading before navigation
+          // Use setTimeout to ensure state updates before navigation
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true })
+          }, 100)
         } else {
           console.warn('⚠️ User is not registered for church app')
           setError('Your account is not registered for the Church Admin app. Please contact an administrator.')
-          await supabase.auth.signOut()
           setLoading(false)
+          // Don't sign out immediately - let user see the error
+          setTimeout(async () => {
+            await supabase.auth.signOut()
+          }, 2000)
         }
       } catch (checkError: any) {
         // Ignore AbortError - it's usually from hot reload or request cancellation
@@ -66,13 +78,18 @@ export default function Login() {
           try {
             const isChurch = await isChurchUser(data.session.user)
             if (isChurch) {
-              console.log('✅ User is registered for church app, navigating to dashboard')
-              navigate('/dashboard')
+              console.log('✅ User is registered for church app, navigating to dashboard (retry)')
+              setLoading(false)
+              setTimeout(() => {
+                navigate('/dashboard', { replace: true })
+              }, 100)
               return
             } else {
               setError('Your account is not registered for the Church Admin app. Please contact an administrator.')
-              await supabase.auth.signOut()
               setLoading(false)
+              setTimeout(async () => {
+                await supabase.auth.signOut()
+              }, 2000)
               return
             }
           } catch (retryError: any) {
